@@ -1,0 +1,153 @@
+package lab1;
+
+import java.util.Scanner;
+
+public class Main {
+
+    public static void main(String[] args) {
+        PalindromeController controller = new PalindromeController();
+        controller.start();
+    }
+}
+
+// Контроллер. Управляет ходом программы:
+// берет данные у View, проверяет их и обрабатывает через Model,
+// а результат снова отдает View для вывода.
+class PalindromeController {
+
+    private PalindromeModel model = new PalindromeModel();
+    private PalindromeView view = new PalindromeView();
+
+    public void start() {
+        String text = view.askString();
+
+        try {
+            checkInput(text);
+
+            if (model.isPalindrome(text)) {
+                view.showIsPalindrome(text);
+
+                // если строка - это ещё и число, дополнительно проверяем квадрат
+                if (model.isNumber(text)) {
+                    String square = model.getSquareAsString(text);
+                    if (model.isPalindrome(square)) {
+                        view.showSquareIsPalindrome(text, square);
+                    } else {
+                        view.showSquareIsNotPalindrome(text, square);
+                    }
+                }
+            } else {
+                view.showIsNotPalindrome(text);
+            }
+
+        } catch (InvalidInputException e) {
+            view.showError(e.getMessage());
+        } catch (NumberFormatException e) {
+            view.showError("Число слишком большое, не могу посчитать квадрат.");
+        }
+    }
+
+    // Проверка ввода. Если строка некорректная - выбрасываем свое исключение.
+    private void checkInput(String text) throws InvalidInputException {
+        if (!model.isCorrectInput(text)) {
+            throw new InvalidInputException(
+                    "строка должна содержать только буквы и цифры и не быть пустой.");
+        }
+    }
+}
+
+// Модель. Здесь находится вся "логика" задачи:
+// проверка строки и проверка чисел.
+class PalindromeModel {
+
+    // Проверяет, что в строке только буквы и цифры (без пробелов и спецсимволов)
+    public boolean isCorrectInput(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (!Character.isLetterOrDigit(c)) {
+                return false;
+            }
+        }
+        // пустую строку тоже считаем некорректным вводом
+        if (text.length() == 0) {
+            return false;
+        }
+        return true;
+    }
+
+    // Проверяет, состоит ли строка только из цифр (то есть является числом)
+    public boolean isNumber(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (!Character.isDigit(text.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Проверяет, является ли строка палиндромом (без учета регистра букв)
+    public boolean isPalindrome(String text) {
+        String lower = text.toLowerCase();
+        int left = 0;
+        int right = lower.length() - 1;
+
+        while (left < right) {
+            if (lower.charAt(left) != lower.charAt(right)) {
+                return false;
+            }
+            left++;
+            right--;
+        }
+        return true;
+    }
+
+    // Считает квадрат числа, переданного строкой, и возвращает его как строку
+    public String getSquareAsString(String numberText) {
+        long number = Long.parseLong(numberText);
+        long square = number * number;
+        return Long.toString(square);
+    }
+}
+
+// Представление (View). Отвечает только за общение с пользователем:
+// вывод текста на экран и чтение того, что он ввел.
+class PalindromeView {
+
+    private Scanner scanner = new Scanner(System.in);
+
+    public String askString() {
+        System.out.println("Введите строку (только буквы и цифры):");
+        return scanner.nextLine();
+    }
+
+    public void showIsPalindrome(String text) {
+        System.out.println("Строка \"" + text + "\" является палиндромом.");
+    }
+
+    public void showIsNotPalindrome(String text) {
+        System.out.println("Строка \"" + text + "\" НЕ является палиндромом.");
+    }
+
+    public void showSquareIsPalindrome(String number, String square) {
+        System.out.println("Число " + number + " является числом-палиндромом.");
+        System.out.println("Квадрат числа: " + square + " - тоже палиндром.");
+    }
+
+    public void showSquareIsNotPalindrome(String number, String square) {
+        System.out.println("Число " + number + " является числом-палиндромом.");
+        System.out.println("Квадрат числа: " + square + " - НЕ палиндром.");
+    }
+
+    public void showError(String message) {
+        System.out.println("Ошибка: " + message);
+    }
+}
+
+// Свой класс исключения. Он нужен, чтобы отличать "плохой ввод"
+// от других ошибок программы.
+class InvalidInputException extends Exception {
+
+    public InvalidInputException(String message) {
+        super(message);
+    }
+}
