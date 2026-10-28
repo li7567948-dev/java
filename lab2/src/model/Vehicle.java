@@ -1,7 +1,7 @@
 package model;
 import java.util.Objects;
 
-public abstract class Vehicle {
+public abstract class Vehicle implements CargoCheck {
     public static final String SAFE="безопасный";
     public static final String FIRE="огнеопасный";
     public static final String CHEMICAL="химически опасный";
@@ -50,7 +50,7 @@ public abstract class Vehicle {
     public abstract double getMaxHeight();
     public abstract double getMaxWeight();
     public abstract int getMaxSpeed();
-    public boolean isDangerous(){return FIRE.equals(cargo)||CHEMICAL.equals(cargo)||BOOM.equals(cargo);}
+    @Override public boolean isDangerous(){return FIRE.equals(cargo)||CHEMICAL.equals(cargo)||BOOM.equals(cargo);}
     public int getCheckTime(){
         int time;
         if(length<=5)time=1;
