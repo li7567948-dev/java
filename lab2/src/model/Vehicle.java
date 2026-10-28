@@ -22,12 +22,18 @@ public abstract class Vehicle {
             ||!Double.isFinite(height)||height<=0
             ||!Double.isFinite(weight)||weight<=0||speed<0)
             throw new IllegalArgumentException("Неверные параметры машины");
-        boolean validCargo=false;
-        for(String item:CARGO) if(item.equals(cargo)) validCargo=true;
-        if(!validCargo) throw new IllegalArgumentException("Неизвестный тип груза");
+        if(!isValidCargo(cargo)) throw new IllegalArgumentException("Неизвестный тип груза");
         this.number=number;this.length=length;this.width=width;this.height=height;
         this.weight=weight;this.speed=speed;this.cargo=cargo;
     }
+    // Доступ по умолчанию (package-private): метод доступен внутри пакета model.
+    static boolean isValidCargo(String cargo) {
+        for(String item:CARGO) {
+            if(item.equals(cargo)) return true;
+        }
+        return false;
+    }
+
     public String getNumber(){return number;}
     public double getLength(){return length;}
     public double getWidth(){return width;}
