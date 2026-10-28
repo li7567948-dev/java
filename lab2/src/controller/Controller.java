@@ -9,7 +9,11 @@ import view.ConsoleView;
 
 public class Controller {
     private final ConsoleView view;
-    public Controller(ConsoleView view){this.view=view;}
+    private final Vehicle[] cars;
+    public Controller(ConsoleView view){
+        this.view=view;
+        this.cars=VehicleFactory.readyVehicles();
+    }
     public void start(){
         int choice;
         do{
@@ -30,7 +34,7 @@ public class Controller {
     private void showCheck(Vehicle vehicle){view.showCheckResult(new CheckResult(vehicle));}
     private void checkReadyVehicles(){
         view.showMessage("===== Проверка готовых машин =====");
-        for(Vehicle vehicle:VehicleFactory.readyVehicles()){
+        for(Vehicle vehicle:cars){
             showCheck(vehicle);
             view.showMessage("--------------------");
         }
