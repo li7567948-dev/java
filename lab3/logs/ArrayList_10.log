@@ -1,0 +1,27 @@
+Start program: 27.10.2026 15:35:52
+ArrayList
+elements = 10
+timeUnit = ns
+add, ID = 0, 2218
+add, ID = 1, 309
+add, ID = 2, 254
+add, ID = 3, 245
+add, ID = 4, 254
+add, ID = 5, 261
+add, ID = 6, 225
+add, ID = 7, 295
+add, ID = 8, 294
+add, ID = 9, 821
+addTotalCount = 10
+addTotalTime = 5176
+addAverageTime = 517.6
+addMedianTime = 277
+set, ID = 5, 1619
+setTotalCount = 1
+setTotalTime = 1619
+setAverageTime = 1619.0
+setMedianTime = 1619
+allOperationsTotalCount = 11
+allOperationsTotalTime = 6795
+allOperationsAverageTime = 617.7272727272727
+Finish program: 27.10.2026 15:35:52

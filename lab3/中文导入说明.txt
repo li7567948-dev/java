@@ -1,0 +1,17 @@
+实验3 — Eclipse 导入说明
+
+1. 解压文件，保留整个 Java_Lab3_Checkpoint 文件夹。
+2. Eclipse > File > Import > General > Existing Projects into Workspace > Next。
+3. 选中解压后的 Java_Lab3_Checkpoint 文件夹 > Finish。
+4. 打开 src/app/Main.java，右键 Run As > Java Application。
+5. 默认会运行演示并生成 10 个集合操作日志（logs 文件夹）。
+6. 想只看第1题，在 Run Configurations > Arguments 填写 --demo。
+7. 想重新生成实验数据，填写 --benchmark。
+8. 也可以在 Windows 上双击 RUN_WINDOWS.bat（需要安装 JDK）。
+
+注意：此程序按之前的“汽车检查站”课题和实验3说明重新实现。虽然找到了过去实验2的存档记录，但旧压缩包无法在本次会话中读取，因此并不是在旧压缩包内逐行修改得到的版本。
+
+AI 聊天原始日志和网盘提交链接需要你自己通过真实会话保存与提交，项目无法自动生成或上传它们。
+
+独立运行老师第7条“可解决性”模式：在 Eclipse 的 Run Configurations → Arguments 中输入 --solvability。
+完整生成10份日志：输入 --benchmark 或 --all（默认）。

@@ -1,0 +1,37 @@
+ЛР №3, пункт 6. Проверка предполагаемых расширений ArrayList
+Времена взяты из реального файла ArrayList_10000.log. Единица: нс.
+Индекс = число добавленных элементов ДО очередной операции add.
+
+Старая формула из задания: (oldCapacity * 3) / 2 + 1
+Современная приблизительная схема: new = old + old/2
+ВАЖНО: ArrayList не предоставляет публичный getter для capacity.
+Время операции само по себе не доказывает значение внутренней ёмкости.
+На время влияют JIT-компиляция, GC и планирование потоков.
+
+Гипотеза: старая формула
+capacityHypothesis=10; measuredAddTime=401; meanNeighbors=326; ratio=1.23
+capacityHypothesis=16; measuredAddTime=108; meanNeighbors=193; ratio=0.56
+capacityHypothesis=25; measuredAddTime=119; meanNeighbors=69; ratio=1.72
+capacityHypothesis=38; measuredAddTime=73; meanNeighbors=68; ratio=1.07
+capacityHypothesis=58; measuredAddTime=197; meanNeighbors=286; ratio=0.69
+capacityHypothesis=88; measuredAddTime=66; meanNeighbors=66; ratio=1.00
+capacityHypothesis=133; measuredAddTime=93; meanNeighbors=85; ratio=1.09
+capacityHypothesis=200; measuredAddTime=66; meanNeighbors=66; ratio=1.00
+capacityHypothesis=301; measuredAddTime=70; meanNeighbors=71; ratio=0.99
+capacityHypothesis=452; measuredAddTime=68; meanNeighbors=77; ratio=0.88
+capacityHypothesis=679; measuredAddTime=61; meanNeighbors=247; ratio=0.25
+capacityHypothesis=1019; measuredAddTime=67; meanNeighbors=84; ratio=0.80
+
+Гипотеза: рост примерно в 1,5 раза
+capacityHypothesis=10; measuredAddTime=401; meanNeighbors=326; ratio=1.23
+capacityHypothesis=15; measuredAddTime=260; meanNeighbors=87; ratio=2.99
+capacityHypothesis=22; measuredAddTime=254; meanNeighbors=72; ratio=3.53
+capacityHypothesis=33; measuredAddTime=294; meanNeighbors=195; ratio=1.51
+capacityHypothesis=49; measuredAddTime=276; meanNeighbors=336; ratio=0.82
+capacityHypothesis=73; measuredAddTime=384; meanNeighbors=97; ratio=3.96
+capacityHypothesis=109; measuredAddTime=386; meanNeighbors=128; ratio=3.02
+capacityHypothesis=163; measuredAddTime=710; meanNeighbors=108; ratio=6.57
+capacityHypothesis=244; measuredAddTime=583; meanNeighbors=84; ratio=6.94
+capacityHypothesis=366; measuredAddTime=633; meanNeighbors=74; ratio=8.55
+capacityHypothesis=549; measuredAddTime=2418; meanNeighbors=120; ratio=20.15
+capacityHypothesis=823; measuredAddTime=2255; meanNeighbors=78; ratio=28.91

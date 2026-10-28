@@ -1,0 +1,27 @@
+Start program: 27.10.2026 15:35:55
+HashMap
+elements = 10
+timeUnit = ns
+put, ID = 0, 16500
+put, ID = 1, 548
+put, ID = 2, 559
+put, ID = 3, 176
+put, ID = 4, 535
+put, ID = 5, 161
+put, ID = 6, 661
+put, ID = 7, 160
+put, ID = 8, 763
+put, ID = 9, 2971
+putTotalCount = 10
+putTotalTime = 23034
+putAverageTime = 2303.4
+putMedianTime = 553
+replace, ID = 5, 13722
+replaceTotalCount = 1
+replaceTotalTime = 13722
+replaceAverageTime = 13722.0
+replaceMedianTime = 13722
+allOperationsTotalCount = 11
+allOperationsTotalTime = 36756
+allOperationsAverageTime = 3341.4545454545455
+Finish program: 27.10.2026 15:35:55
