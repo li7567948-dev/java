@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-    <name>Java_Lab3_Checkpoint</name>
-    <comment>Лабораторная работа № 3 - Пункт пропуска автомобилей</comment>
-    <projects></projects>
+    <name>lab3</name>
+    <comment>Java lab 3, based on lab 2 vehicle-checkpoint MVC</comment>
+    <projects/>
     <buildSpec>
-        <buildCommand><name>org.eclipse.jdt.core.javabuilder</name><arguments></arguments></buildCommand>
+        <buildCommand><name>org.eclipse.jdt.core.javabuilder</name><arguments/></buildCommand>
     </buildSpec>
     <natures><nature>org.eclipse.jdt.core.javanature</nature></natures>
 </projectDescription>

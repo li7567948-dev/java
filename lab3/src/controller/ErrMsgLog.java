@@ -9,111 +9,128 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Locale;
 
-/** One place for all messages, errors and operation logs (tasks 3 and 4). */
-public final class ErrMsgLog implements AutoCloseable {
-    private static final DateTimeFormatter TIME =
-            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
-    private final Path directory;
-    private BufferedWriter writer;
-    private int errorCounter;
-    private int operationCounter;
-    private long operationTotalTime;
+/**
+ * Central message, operation-log and exception handler (lab No. 3, task 4).
+ * All error messages and an error counter are kept in this one class.
+ */
+public final class ErrMsgLog {
+    private static final DateTimeFormatter DATE =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss", Locale.ROOT);
 
-    public ErrMsgLog(Path directory) throws IOException {
-        this.directory = directory;
-        Files.createDirectories(directory);
+    private final Path logDirectory;
+    private int errorCount;
+
+    public ErrMsgLog(Path logDirectory) throws IOException {
+        if (logDirectory == null) throw new IllegalArgumentException("Папка логов не задана");
+        Files.createDirectories(logDirectory);
+        this.logDirectory = logDirectory;
     }
 
-    public int getErrorCount() { return errorCounter; }
-
-    public Path getDirectory() { return directory; }
-
-    /** Last-resort handling if initialization of the log directory itself fails. */
-    public static void reportStartupError(Exception exception) {
-        System.err.println("Ошибка запуска: " + exception.getMessage());
+    public synchronized int getErrorCount() {
+        return errorCount;
     }
 
-    public void info(String message) { System.out.println(message); }
-
-    /** Centralized creation of an analysis log, as required by task 4. */
-    public void analysisLog(String filename, String content) throws IOException {
-        Files.write(directory.resolve(filename), content.getBytes(StandardCharsets.UTF_8),
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-    }
-
-    public void error(Exception exception) {
-        errorCounter++;
-        String message = "Ошибка №" + errorCounter + ": " + exception.getMessage();
-        System.err.println(message);
-        try {
-            Files.write(directory.resolve("errors.log"),
-                    (LocalDateTime.now().format(TIME) + " " + message + "\n")
-                            .getBytes(StandardCharsets.UTF_8),
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (IOException logError) {
-            System.err.println("Не удалось записать ошибку в файл: " + logError.getMessage());
+    /** Centralized registration and formatting of all user-visible errors. */
+    public synchronized String error(Exception exception) {
+        ++errorCount;
+        String explanation = exception.getMessage();
+        if (explanation == null || explanation.trim().isEmpty()) {
+            explanation = exception.getClass().getSimpleName();
         }
-    }
-
-    public void openOperationLog(String collection, int size) throws IOException {
-        finishOperationLog();
-        Path path = directory.resolve(collection + "_" + size + ".log");
-        writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8);
-        operationCounter = 0;
-        operationTotalTime = 0;
-        write("Start program: " + LocalDateTime.now().format(TIME));
-        write(collection);
-        write("elements = " + size);
-        write("timeUnit = ns");
-    }
-
-    public void operation(String type, int index, long timeNs) throws IOException {
-        if (timeNs < 0) throw new IllegalArgumentException("Время операции отрицательное");
-        write(type + ", ID = " + index + ", " + timeNs);
-        operationCounter++;
-        operationTotalTime += timeNs;
-    }
-
-    public void summary(String type, long[] times) throws IOException {
-        long total = 0;
-        for (long time : times) total += time;
-        long[] ordered = times.clone();
-        Arrays.sort(ordered);
-        long median = 0;
-        if (ordered.length != 0) {
-            int mid = ordered.length / 2;
-            median = ordered.length % 2 == 1 ? ordered[mid] :
-                    ordered[mid - 1] / 2 + ordered[mid] / 2
-                            + ((ordered[mid - 1] % 2 + ordered[mid] % 2) / 2);
+        String message = "Ошибка №" + errorCount + ": " + explanation;
+        try (BufferedWriter writer = Files.newBufferedWriter(
+                logDirectory.resolve("errors.log"), StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+            writer.write(LocalDateTime.now().format(DATE) + " | " + message);
+            writer.newLine();
+        } catch (IOException logFailure) {
+            // The handler still owns this fallback error message.
+            System.err.println("Ошибка записи журнала: " + logFailure.getMessage());
         }
-        write(type + "TotalCount = " + times.length);
-        write(type + "TotalTime = " + total);
-        write(type + "AverageTime = " + (times.length == 0 ? 0 : (double) total / times.length));
-        // The assignment names the median field; report the actual statistical median.
-        write(type + "MedianTime = " + median);
+        return message;
     }
 
-    public void finishOperationLog() throws IOException {
-        if (writer != null) {
-            try {
-                write("allOperationsTotalCount = " + operationCounter);
-                write("allOperationsTotalTime = " + operationTotalTime);
-                write("allOperationsAverageTime = "
-                        + (operationCounter == 0 ? 0 : (double) operationTotalTime / operationCounter));
-                write("Finish program: " + LocalDateTime.now().format(TIME));
-            } finally {
-                try { writer.close(); }
-                finally { writer = null; }
+    public OperationLog openOperations(String kind, int size) throws IOException {
+        if (!("ArrayList".equals(kind) || "HashMap".equals(kind))) {
+            throw new IllegalArgumentException("Неизвестный тип коллекции");
+        }
+        if (size <= 0) throw new IllegalArgumentException("Размер коллекции должен быть положительным");
+        return new OperationLog(logDirectory.resolve(kind + "_" + size + ".log"), kind, size);
+    }
+
+    /** Buffered log writer: I/O is explicitly outside timed operations. */
+    public static final class OperationLog implements AutoCloseable {
+        private final BufferedWriter writer;
+        private boolean finished;
+
+        private OperationLog(Path file, String kind, int size) throws IOException {
+            writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            line("Start program: " + LocalDateTime.now().format(DATE));
+            line(kind);
+            line("Collection size = " + size);
+            line("Time unit = nanoseconds (System.nanoTime)");
+        }
+
+        private void line(String text) throws IOException {
+            writer.write(text);
+            writer.newLine();
+        }
+
+        public void operation(String action, int key, long durationNanos) throws IOException {
+            if (finished || durationNanos < 0 || key < 0) {
+                throw new IllegalStateException("Некорректная запись операции");
             }
+            line(action + ", ID = " + key + ", " + durationNanos);
+        }
+
+        public void finish(String insertionName, long[] insertTimes,
+                           String replacementName, long[] replaceTimes) throws IOException {
+            if (finished) throw new IllegalStateException("Журнал уже завершён");
+            summarize(insertionName, insertTimes);
+            summarize(replacementName, replaceTimes);
+            long allTime = sum(insertTimes) + sum(replaceTimes);
+            int count = insertTimes.length + replaceTimes.length;
+            line("allOperationsTotalCount = " + count);
+            line("allOperationsTotalTime = " + allTime);
+            line("allOperationsAverageTime = " + decimal(allTime / (double) count));
+            line("Finish program: " + LocalDateTime.now().format(DATE));
+            finished = true;
+            writer.flush();
+        }
+
+        private void summarize(String name, long[] times) throws IOException {
+            if (times == null || times.length == 0) {
+                throw new IllegalArgumentException("Операции не измерены");
+            }
+            long total = sum(times);
+            long[] ordered = times.clone();
+            Arrays.sort(ordered);
+            double median = ordered.length % 2 == 0
+                    ? (ordered[ordered.length / 2 - 1] / 2.0
+                    + ordered[ordered.length / 2] / 2.0)
+                    : ordered[ordered.length / 2];
+            line(name + "TotalCount = " + times.length);
+            line(name + "TotalTime = " + total);
+            line(name + "AverageTime = " + decimal(total / (double) times.length));
+            line(name + "MedianTime = " + decimal(median));
+        }
+
+        private static long sum(long[] times) {
+            long total = 0;
+            for (long value : times) total += value;
+            return total;
+        }
+
+        private static String decimal(double value) {
+            return String.format(Locale.US, "%.2f", value);
+        }
+
+        @Override
+        public void close() throws IOException {
+            writer.close();
         }
     }
-
-    private void write(String text) throws IOException {
-        if (writer == null) throw new IllegalStateException("Лог не открыт");
-        writer.write(text);
-        writer.newLine();
-    }
-
-    @Override public void close() throws IOException { finishOperationLog(); }
 }

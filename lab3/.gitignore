@@ -1,0 +1,8 @@
+/bin/
+/out/
+*.class
+/logs/*.log
+/logs/*.txt
+/results/summary.csv
+/results/arraylist_capacity.txt
+/results/conclusion_ru.txt
