@@ -12,6 +12,7 @@ import java.util.Queue;
  * This class is the generic element type of both collections in lab No. 3.
  */
 public final class Simulation {
+    private final int experimentId;
     private final List<CheckPoint> points = new ArrayList<CheckPoint>();
     private final Queue<Vehicle> queue = new ArrayDeque<Vehicle>();
     private final List<Event> events = new ArrayList<Event>();
@@ -20,7 +21,17 @@ public final class Simulation {
     private int allowed;
     private int denied;
 
+    /** Original lab No. 2 constructor, preserved for existing code. */
     public Simulation(int pointCount) {
+        this(0, pointCount);
+    }
+
+    /** Identifier is used when a Simulation is stored in a lab No. 3 collection. */
+    public Simulation(int experimentId, int pointCount) {
+        if (experimentId < 0) {
+            throw new IllegalArgumentException("Отрицательный идентификатор опыта");
+        }
+        this.experimentId = experimentId;
         if (pointCount < 1 || pointCount > 100) {
             throw new IllegalArgumentException("Количество пунктов должно быть от 1 до 100");
         }
@@ -36,9 +47,6 @@ public final class Simulation {
             throw new IllegalArgumentException("Неверный номер пункта");
         }
         CheckPoint point = points.get(id - 1);
-        if (!open && !point.isFree()) {
-            throw new IllegalStateException("Нельзя закрыть пункт во время проверки");
-        }
         point.setOpen(open);
         events.add(new Event(time, open ? "Пункт открыт" : "Пункт закрыт", null, id));
     }
@@ -100,6 +108,7 @@ public final class Simulation {
         }
     }
 
+    public int getExperimentId() { return experimentId; }
     public int getTime() { return time; }
     public int getCompleted() { return completed; }
     public int getAllowed() { return allowed; }

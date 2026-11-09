@@ -17,7 +17,13 @@ public final class CheckPoint {
 
     public int getId() { return id; }
     public boolean isOpen() { return open; }
-    public void setOpen(boolean open) { this.open = open; }
+    /** Prevent a busy checkpoint from being closed mid-inspection. */
+    public void setOpen(boolean open) {
+        if (!open && !isFree()) {
+            throw new IllegalStateException("Нельзя закрыть пункт во время проверки");
+        }
+        this.open = open;
+    }
     public boolean isFree() { return vehicle == null; }
     public Vehicle getCurrentVehicle() { return vehicle; }
     public int getTimeLeft() { return timeLeft; }

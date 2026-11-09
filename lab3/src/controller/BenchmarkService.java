@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -77,7 +78,8 @@ public final class BenchmarkService {
             log.finish("add", additions, "set", replacements);
         }
         if (simulations.size() != size) throw new IllegalStateException("Размер ArrayList изменился");
-        return new Measurement("ArrayList", size, sum(additions), sum(replacements));
+        return new Measurement("ArrayList", size, sum(additions), sum(replacements),
+                median(additions), median(replacements));
     }
 
     public Measurement runHashMap(int size) throws IOException {
@@ -110,7 +112,8 @@ public final class BenchmarkService {
             log.finish("put", additions, "replace", replacements);
         }
         if (simulations.size() != size) throw new IllegalStateException("Размер HashMap изменился");
-        return new Measurement("HashMap", size, sum(additions), sum(replacements));
+        return new Measurement("HashMap", size, sum(additions), sum(replacements),
+                median(additions), median(replacements));
     }
 
     private void requireSize(int size) {
@@ -142,53 +145,72 @@ public final class BenchmarkService {
         Path csv = resultDirectory.resolve("summary.csv");
         try (BufferedWriter writer = Files.newBufferedWriter(csv, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            writer.write("collection;size;addTotalNs;addAverageNs;changeTotalNs;changeAverageNs");
+            writer.write("collection;size;addTotalNs;addAverageNs;addMedianNs;"
+                    + "changeTotalNs;changeAverageNs;changeMedianNs");
             writer.newLine();
             for (Measurement row : measurements) {
                 writer.write(row.kind + ";" + row.size + ";" + row.addTotal + ";"
-                        + format(row.getAddAverage()) + ";" + row.changeTotal + ";"
-                        + format(row.getChangeAverage()));
+                        + format(row.getAddAverage()) + ";" + format(row.getAddMedian())
+                        + ";" + row.changeTotal + ";" + format(row.getChangeAverage())
+                        + ";" + format(row.getChangeMedian()));
                 writer.newLine();
             }
         }
         writeConclusion(measurements);
     }
 
+    /** Compare both total and median values for each collection and size. */
     private void writeConclusion(List<Measurement> results) throws IOException {
         Path conclusion = resultDirectory.resolve("conclusion_ru.txt");
         try (BufferedWriter writer = Files.newBufferedWriter(conclusion, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
             writer.write("ВЫВОД ПО ЛАБОРАТОРНОЙ РАБОТЕ № 3"); writer.newLine();
-            writer.write("Данные являются результатами конкретного запуска JVM; единица: нс.");
+            writer.write("Единица времени: нс; показатели относятся к конкретному запуску JVM.");
             writer.newLine();
-            writer.write("Генерация объектов и запись в лог не включены в измеряемую операцию.");
+            writer.write("Время генерации объектов и записи логов исключено из измерений.");
             writer.newLine();
+            writer.write("Total — полное время данного типа операций, Median — медиана времени одной операции.");
+            writer.newLine();
+
             for (String kind : new String[] {"ArrayList", "HashMap"}) {
                 Measurement first = lookup(results, kind, 10);
                 Measurement last = lookup(results, kind, 100000);
-                writer.write(kind + ": при увеличении N с 10 до 100000 ");
-                writer.write("среднее время добавления изменилось с " + format(first.getAddAverage())
-                        + " до " + format(last.getAddAverage()) + " нс; ");
-                writer.write("среднее время изменения с " + format(first.getChangeAverage())
-                        + " до " + format(last.getChangeAverage()) + " нс.");
+                writer.write(kind + ": при росте N с 10 до 100000:"); writer.newLine();
+                writer.write("  Добавление: Total " + first.addTotal + " → " + last.addTotal
+                        + " (x" + format(ratio(last.addTotal, first.addTotal)) + "); Median "
+                        + format(first.addMedian) + " → " + format(last.addMedian)
+                        + " (x" + format(ratio(last.addMedian, first.addMedian)) + ").");
                 writer.newLine();
-                writer.write("Отношение полных времён добавления (100000/10): "
-                        + format(last.addTotal / (double) Math.max(1, first.addTotal)));
-                writer.newLine();
-                writer.write("Отношение полных времён изменения (100000/10): "
-                        + format(last.changeTotal / (double) Math.max(1, first.changeTotal)));
+                writer.write("  Изменение: Total " + first.changeTotal + " → " + last.changeTotal
+                        + " (x" + format(ratio(last.changeTotal, first.changeTotal)) + "); Median "
+                        + format(first.changeMedian) + " → " + format(last.changeMedian)
+                        + " (x" + format(ratio(last.changeMedian, first.changeMedian)) + ").");
                 writer.newLine();
             }
-            writer.write("Сравнение: доступ к элементу ArrayList по индексу и HashMap по ключу "
-                    + "обычно быстрый; увеличение ёмкости может создавать отдельные пики задержек.");
+            writer.write("Сопоставление двух коллекций при одинаковых размерах:");
             writer.newLine();
-            writer.write("При малых N измерения шумные из-за JIT, сборщика мусора и таймера; "
-                    + "для устойчивых выводов необходимо повторение экспериментов.");
+            for (int size : SIZES) {
+                Measurement array = lookup(results, "ArrayList", size);
+                Measurement map = lookup(results, "HashMap", size);
+                writer.write("  N=" + size + ": add/put Median ArrayList="
+                        + format(array.addMedian) + ", HashMap=" + format(map.addMedian)
+                        + "; set/replace Median ArrayList=" + format(array.changeMedian)
+                        + ", HashMap=" + format(map.changeMedian) + " нс.");
+                writer.newLine();
+            }
+            writer.write("Вывод: Total учитывает увеличение числа операций, а Median "
+                    + "показывает типичное время отдельного вызова. У разных коллекций "
+                    + "добавление и изменение могут иметь разные накладные расходы.");
             writer.newLine();
-            writer.write("Среднее арифметическое (Average) и медиана (Median) "
-                    + "вычислены отдельно и не подменяют друг друга.");
+            writer.write("JIT-компиляция, сборщик мусора, масштаб кэшей и системная нагрузка "
+                    + "влияют на единичный замер. Одна серия — учебный эксперимент, "
+                    + "не универсальный рейтинг производительности.");
             writer.newLine();
         }
+    }
+
+    private static double ratio(double a, double b) {
+        return a / Math.max(1.0, b);
     }
 
     private static Measurement lookup(List<Measurement> measurements, String type, int size) {
@@ -208,17 +230,32 @@ public final class BenchmarkService {
         return total;
     }
 
+    private static double median(long[] values) {
+        if (values.length == 0) throw new IllegalArgumentException("Нет измерений");
+        long[] sorted = values.clone();
+        Arrays.sort(sorted);
+        int middle = sorted.length / 2;
+        return sorted.length % 2 == 0
+                ? sorted[middle - 1] / 2.0 + sorted[middle] / 2.0
+                : sorted[middle];
+    }
+
     public static final class Measurement {
         private final String kind;
         private final int size;
         private final long addTotal;
         private final long changeTotal;
+        private final double addMedian;
+        private final double changeMedian;
 
-        private Measurement(String kind, int size, long addTotal, long changeTotal) {
+        private Measurement(String kind, int size, long addTotal, long changeTotal,
+                            double addMedian, double changeMedian) {
             this.kind = kind;
             this.size = size;
             this.addTotal = addTotal;
             this.changeTotal = changeTotal;
+            this.addMedian = addMedian;
+            this.changeMedian = changeMedian;
         }
 
         public String getKind() { return kind; }
@@ -227,5 +264,7 @@ public final class BenchmarkService {
         public long getChangeTotal() { return changeTotal; }
         public double getAddAverage() { return addTotal / (double) size; }
         public double getChangeAverage() { return changeTotal / (double) (size / 10); }
+        public double getAddMedian() { return addMedian; }
+        public double getChangeMedian() { return changeMedian; }
     }
 }

@@ -16,6 +16,28 @@ public final class VehicleFactory {
         }
     }
 
+    /** Creates an independent copy, retaining the lab No. 2 vehicle subclass. */
+    public static Vehicle copyOf(Vehicle original) {
+        if (original == null) throw new IllegalArgumentException("Машина отсутствует");
+        final int type;
+        if (original instanceof Car) {
+            type = 1;
+        } else if (original instanceof Truck) {
+            type = 2;
+        } else if (original instanceof Bus) {
+            type = 3;
+        } else if (original instanceof Trailer) {
+            type = 4;
+        } else if (original instanceof CarWithTrailer) {
+            type = 5;
+        } else {
+            throw new IllegalArgumentException("Неизвестный тип машины");
+        }
+        return create(type, original.getNumber(), original.getLength(), original.getWidth(),
+                original.getHeight(), original.getWeight(), original.getSpeed(),
+                original.getCargo());
+    }
+
     public static Vehicle[] readyVehicles() {
         return new Vehicle[] {
                 create(1, "A001", 4.5, 1.8, 1.5, 1500, 60, Vehicle.SAFE),

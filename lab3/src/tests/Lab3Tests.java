@@ -119,6 +119,9 @@ public final class Lab3Tests {
         mustFail(new Runnable() { public void run() {
             busy.setPointOpen(1, false);
         }}, "Busy checkpoint cannot close");
+        mustFail(new Runnable() { public void run() {
+            busy.getPoints().get(0).setOpen(false);
+        }}, "Busy checkpoint cannot be closed directly");
         Simulation ready = new Simulation(2);
         ready.runReady(5);
         check(ready.getCompleted() >= 2, "Old lab2 ready simulation preserved");
@@ -143,6 +146,7 @@ public final class Lab3Tests {
                 "CheckResult generator");
         check(generator.generateArrivalGenerator() instanceof Generator, "Arrival generator");
         Simulation root = generator.generateSimulation(7);
+        check(root.getExperimentId() == 7, "Random root retains collection experiment ID");
         check(root.getPoints().size() > 0 && root.getQueueSize() > 0
                 && !root.getEvents().isEmpty(), "Root simulation holds complete hierarchy");
     }
@@ -166,6 +170,14 @@ public final class Lab3Tests {
         List<Vehicle> queue = service.exampleQueue();
         check(service.simulate(queue, 1) == 16, "Initial four trailers need 16 minutes");
         check(service.simulate(queue, 2) == 8, "Two real points need 8 minutes");
+        Vehicle stateful = new Car("S1", 4, 2, 2, 1000, 30, Vehicle.SAFE);
+        stateful.setArriveTime(37);
+        new CheckResult(stateful);
+        String reasonBefore = stateful.getReason();
+        check(service.simulate(Arrays.asList(stateful), 1) == 1,
+                "Real simulation handles an independent copy");
+        check(stateful.getArriveTime() == 37 && reasonBefore.equals(stateful.getReason()),
+                "Solvability analysis does not mutate caller vehicles");
         SolvabilityService.Result solution = service.analyze(queue, 1, 2, 10);
         check(solution.isFeasible() && solution.getProposedPoints() == 2
                 && solution.getProposedMinutes() == 8, "Open one real reserve point");
@@ -175,6 +187,18 @@ public final class Lab3Tests {
         check(already.isFeasible() && already.getProposedMinutes() == 8,
                 "Already feasible cases do not require changes");
         check(!solution.getExplanation().isEmpty(), "A real proposal is explained");
+        // Regression: shortest-first incorrectly reports no solution for 1,1,1,3.
+        List<Vehicle> differentOrder = Arrays.<Vehicle>asList(
+                new Car("A1", 4, 2, 2, 1500, 30, Vehicle.SAFE),
+                new Car("A2", 4, 2, 2, 1500, 30, Vehicle.SAFE),
+                new Car("A3", 4, 2, 2, 1500, 30, Vehicle.SAFE),
+                new Bus("B1", 12, 2.5, 3.5, 12000, 30, Vehicle.SAFE));
+        check(service.simulate(differentOrder, 2) == 4, "Original order takes 4 minutes");
+        SolvabilityService.Result reorder = service.analyze(differentOrder, 2, 2, 3);
+        check(reorder.isFeasible() && reorder.getProposedMinutes() == 3
+                && reorder.getProposedPoints() == 2, "Longest-first finds real 3-minute schedule");
+        check(service.analyze(differentOrder, 2, 2, 2).getExplanation()
+                .contains("НЕ доказательство"), "No false impossibility claim");
     }
 
     private static void testInteractiveController() throws IOException {
@@ -187,6 +211,16 @@ public final class Lab3Tests {
         String output = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
         check(output.contains("ПРОВЕРКА ГОТОВЫХ МАШИН"), "Original menu option 1 works");
         check(output.contains("Выход из программы"), "Exit option works");
+        // The new menu must accept teacher-defined constraints without breaking MVC.
+        String teacherInput = "5\n2\n4\n2\n2\n20\n0\n";
+        ByteArrayOutputStream otherOutput = new ByteArrayOutputStream();
+        ConsoleView otherView = new ConsoleView(new ByteArrayInputStream(
+                teacherInput.getBytes(StandardCharsets.UTF_8)),
+                new PrintStream(otherOutput, true, "UTF-8"));
+        new Controller(otherView, log, Paths.get("results", "tests-interactive")).start();
+        String printed = new String(otherOutput.toByteArray(), StandardCharsets.UTF_8);
+        check(printed.contains("РЕЖИМ РАЗРЕШИМОСТИ")
+                && printed.contains("Выход из программы"), "Interactive solvability settings work");
     }
 
     private static void testBenchmarks() throws IOException {
@@ -214,7 +248,8 @@ public final class Lab3Tests {
         new ArrayListCapacityStudy().run(file);
         String content = new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
         check(content.contains("(oldCapacity * 3) / 2 + 1"), "Legacy capacity formula examined");
-        check(content.contains("16;"), "Legacy boundary measured");
+        check(content.contains("10;16;"), "Growth measured from old capacity 10 to legacy 16");
+        check(content.contains("addWithGrowthNs"), "Actual expansion timed");
     }
 
     private static void testFullBenchmarks() throws IOException {
@@ -226,8 +261,15 @@ public final class Lab3Tests {
             verifyLog(logRoot.resolve("ArrayList_" + size + ".log"), "add", "set", size);
             verifyLog(logRoot.resolve("HashMap_" + size + ".log"), "put", "replace", size);
         }
-        check(Files.exists(Paths.get("results", "summary.csv")), "CSV results generated");
-        check(Files.exists(Paths.get("results", "conclusion_ru.txt")), "Russian conclusion generated");
+        Path summary = Paths.get("results", "summary.csv");
+        check(Files.exists(summary), "CSV results generated");
+        check(Files.readAllLines(summary, StandardCharsets.UTF_8).get(0)
+                .contains("changeMedianNs"), "Summary CSV contains both operation medians");
+        Path conclusion = Paths.get("results", "conclusion_ru.txt");
+        check(Files.exists(conclusion), "Russian conclusion generated");
+        String text = new String(Files.readAllBytes(conclusion), StandardCharsets.UTF_8);
+        check(text.contains("Median") && text.contains("Total") && text.contains("Сопоставление"),
+                "Conclusion compares both total times and medians across collections");
     }
 
     /** Checks that every operation and all totals really match the written log. */

@@ -2,6 +2,7 @@ package controller;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -59,7 +60,7 @@ public final class Controller {
             case 2: checkOwnVehicle(); break;
             case 3: runSimulation(); break;
             case 4: runBenchmarks(); break;
-            case 5: runSolvability(); break;
+            case 5: runSolvabilityInteractive(); break;
             case 6: runCapacityStudy(); break;
             default: throw new IllegalArgumentException("Неверный пункт меню: " + choice);
         }
@@ -144,10 +145,42 @@ public final class Controller {
         view.showMessage("Созданы 10 логов и results/summary.csv; errors=" + messages.getErrorCount());
     }
 
+    /** CLI demonstration: deterministic and does not block for user input. */
     public void runSolvability() {
         SolvabilityService service = new SolvabilityService();
         view.showMessage("Четыре трейлера по 4 мин; 1 рабочий и 1 резервный пункт.");
         view.showSolvability(service.analyze(service.exampleQueue(), 1, 2, 10));
+    }
+
+    /** Menu mode: allow a teacher to enter real constraints for a random queue. */
+    private void runSolvabilityInteractive() {
+        view.showMessage("1 — Готовый демонстрационный пример");
+        view.showMessage("2 — Случайная очередь с заданными параметрами");
+        int mode = readInt("Режим: ");
+        if (mode == 1) {
+            runSolvability();
+            return;
+        }
+        if (mode != 2) throw new IllegalArgumentException("Неизвестный режим");
+
+        int count = readInt("Количество автомобилей (1..30): ");
+        int active = readInt("Работающие пункты (1..10): ");
+        int installed = readInt("Всего установлено пунктов (не меньше работающих, до 10): ");
+        int deadline = readInt("Срок завершения проверки (мин): ");
+        if (count < 1 || count > 30 || active < 1 || active > 10
+                || installed < active || installed > 10 || deadline < 1 || deadline > 100000) {
+            throw new IllegalArgumentException("Параметры задачи выходят за допустимые пределы");
+        }
+        Lab3ObjectGenerator generator = new Lab3ObjectGenerator(System.nanoTime());
+        List<Vehicle> vehicles = new ArrayList<Vehicle>();
+        for (int index = 0; index < count; ++index) vehicles.add(generator.generateVehicle());
+        view.showMessage("Сгенерирована очередь. Продолжительность каждой проверки:");
+        for (Vehicle vehicle : vehicles) {
+            view.showMessage(vehicle.getType() + " " + vehicle.getNumber() + ": "
+                    + vehicle.getCheckTime() + " мин");
+        }
+        view.showSolvability(new SolvabilityService().analyze(
+                vehicles, active, installed, deadline));
     }
 
     public void runCapacityStudy() throws IOException {

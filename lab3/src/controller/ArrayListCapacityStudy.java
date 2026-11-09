@@ -10,63 +10,84 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 /**
- * Task 6: explore whether spikes occur around sizes predicted by the formula
- * oldCapacity*3/2+1. That formula describes historical implementations;
- * capacity is not exposed by the public ArrayList API in modern Java.
+ * Task 6: compare an append that fits in a deliberately sized ArrayList
+ * with one that must grow its internal backing array.
+ *
+ * <p>The historical formula from the handout is printed as a prediction,
+ * NOT as a claim about the capacity of a current Java implementation.</p>
  */
 public final class ArrayListCapacityStudy {
     private static final int TRIALS = 160;
+    private static volatile Object retainedList;
 
     public void run(Path destination) throws IOException {
-        if (destination == null) throw new IllegalArgumentException("Не задан путь отчёта");
+        if (destination == null || destination.getParent() == null) {
+            throw new IllegalArgumentException("Не задан допустимый путь отчёта");
+        }
         Files.createDirectories(destination.getParent());
+        warmUpJVM();
         try (BufferedWriter writer = Files.newBufferedWriter(destination, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            writer.write("Исследование изменения времени ArrayList.add"); writer.newLine();
-            writer.write("Формула из пособия: (oldCapacity * 3) / 2 + 1"); writer.newLine();
-            writer.write("Для современных Java данная формула не является контрактом API.");
+            writer.write("Исследование времени ArrayList.add при увеличении ёмкости");
             writer.newLine();
-            writer.write("Среднее время одной операции в нс по " + TRIALS + " запускам.");
+            writer.write("Формула из пособия: (oldCapacity * 3) / 2 + 1");
             writer.newLine();
-            writer.write("legacyCapacity;addBeforeNs;addAtBoundaryNs;addAfterNs"); writer.newLine();
+            writer.write("Проводятся " + TRIALS + " парных измерений для каждой начальной ёмкости.");
+            writer.newLine();
+            writer.write("Оба списка создаются как new ArrayList<>(oldCapacity).");
+            writer.newLine();
+            writer.write("Без роста: add при size = oldCapacity-1 (список ещё не заполнен).");
+            writer.newLine();
+            writer.write("С ростом: add при size = oldCapacity (добавляется oldCapacity+1-й элемент).");
+            writer.newLine();
+            writer.write("Следующий размер из старой формулы — расчётный, НЕ подтверждённый размер JVM.");
+            writer.newLine();
+            writer.write("oldCapacity;legacyNextCapacity;addWithoutGrowthNs;addWithGrowthNs;growthRatio");
+            writer.newLine();
             for (int oldCapacity = 10, step = 0; step < 8; ++step) {
-                int candidate = oldCapacity * 3 / 2 + 1;
-                double before = averageAddition(candidate - 2);
-                double onBoundary = averageAddition(candidate - 1);
-                double after = averageAddition(candidate);
-                writer.write(candidate + ";" + format(before) + ";" + format(onBoundary)
-                        + ";" + format(after));
+                int predicted = oldCapacity * 3 / 2 + 1;
+                double inside = averageAppend(oldCapacity, false);
+                double expanding = averageAppend(oldCapacity, true);
+                writer.write(oldCapacity + ";" + predicted + ";" + decimal(inside) + ";"
+                        + decimal(expanding) + ";" + decimal(expanding / Math.max(1, inside)));
                 writer.newLine();
-                oldCapacity = candidate;
+                oldCapacity = predicted;
             }
             writer.newLine();
-            writer.write("Вывод: измеряются операции вокруг расчётных границ, "
-                    + "но отдельный пик не доказывает внутреннюю фактическую ёмкость.");
+            writer.write("Вывод: измерено изменение времени при заведомом требовании расширения "
+                    + "явно заданной ёмкости. Реальную новую ёмкость ArrayList мы не считываем.");
             writer.newLine();
-            writer.write("Для повторения используйте ту же JVM, увеличьте число измерений "
-                    + "и учитывайте шум JIT/GC.");
+            writer.write("JIT/GC и разрешение System.nanoTime влияют на отдельные результаты. "
+                    + "Повторение эксперимента рекомендуется.");
             writer.newLine();
         }
     }
 
-    /** Measures the addition at zero-based index insertionIndex. */
-    private double averageAddition(int insertionIndex) {
+    private static void warmUpJVM() {
+        for (int i = 0; i < 5000; ++i) {
+            ArrayList<Object> list = new ArrayList<Object>(10);
+            for (int j = 0; j < 11; ++j) list.add(Boolean.TRUE);
+            retainedList = list;
+        }
+    }
+
+    /** Times only add(), not the constructor, initialization or volatile store. */
+    private static double averageAppend(int capacity, boolean forceGrowth) {
+        Object item = Boolean.TRUE;
         long total = 0;
-        Object item = new Object();
-        // Warm-up the addition path without measuring it.
-        ArrayList<Object> warmup = new ArrayList<Object>();
-        for (int i = 0; i < 10000; ++i) warmup.add(item);
         for (int trial = 0; trial < TRIALS; ++trial) {
-            ArrayList<Object> list = new ArrayList<Object>();
-            for (int i = 0; i < insertionIndex; ++i) list.add(item);
+            ArrayList<Object> list = new ArrayList<Object>(capacity);
+            int initialCount = forceGrowth ? capacity : capacity - 1;
+            for (int j = 0; j < initialCount; ++j) list.add(item);
             long start = System.nanoTime();
             list.add(item);
             total += System.nanoTime() - start;
+            retainedList = list;  // Avoid dead-code elimination of the result.
         }
         return total / (double) TRIALS;
     }
 
-    private static String format(double value) {
+    private static String decimal(double value) {
         return String.format(Locale.US, "%.2f", value);
     }
 }

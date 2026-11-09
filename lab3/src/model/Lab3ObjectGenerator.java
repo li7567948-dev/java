@@ -77,7 +77,7 @@ public final class Lab3ObjectGenerator {
     /** A meaningful root object with checkpoints, queued vehicles and arrival events. */
     public Simulation generateSimulation(int id) {
         if (id < 0) throw new IllegalArgumentException("Отрицательный индекс");
-        Simulation simulation = new Simulation(1 + random.nextInt(3));
+        Simulation simulation = new Simulation(id, 1 + random.nextInt(3));
         int arrivals = 1 + random.nextInt(2);
         for (int i = 0; i < arrivals; ++i) simulation.addVehicle(generateVehicle());
         return simulation;

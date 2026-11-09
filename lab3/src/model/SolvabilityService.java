@@ -6,14 +6,26 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Checks whether the vehicles already waiting in a queue can be INSPECTED
- * before a deadline. Only physical remedies are considered: change queue
- * order and open one of the EXISTING reserve checkpoints.
+ * Searches for a practical way to finish vehicle inspections before a deadline.
  *
- * <p>Inspection throughput is not a promise that every vehicle will be
- * allowed to cross: admission rules remain those of Vehicle.pass().</p>
+ * <p>Only genuine changes are allowed: reorder an existing queue or open an
+ * installed reserve checkpoint. Every reported positive result is checked by
+ * the original lab No. 2 Simulation, never by a made-up time estimate.</p>
+ *
+ * <p>The tested orderings (original, shortest first, longest first) are
+ * heuristics, not an exhaustive proof that no other schedule exists.</p>
  */
 public final class SolvabilityService {
+    private static final Comparator<Vehicle> SHORTEST_FIRST = new Comparator<Vehicle>() {
+        @Override public int compare(Vehicle a, Vehicle b) {
+            return Integer.compare(a.getCheckTime(), b.getCheckTime());
+        }
+    };
+    private static final Comparator<Vehicle> LONGEST_FIRST = new Comparator<Vehicle>() {
+        @Override public int compare(Vehicle a, Vehicle b) {
+            return Integer.compare(b.getCheckTime(), a.getCheckTime());
+        }
+    };
 
     public Result analyze(List<Vehicle> vehicles, int activePoints,
                           int installedPoints, int deadlineMinutes) {
@@ -22,68 +34,77 @@ public final class SolvabilityService {
                 || deadlineMinutes < 1) {
             throw new IllegalArgumentException("Неверные параметры режима разрешимости");
         }
-        int current = simulate(vehicles, activePoints);
-        if (current <= deadlineMinutes) {
-            return new Result(current, current, activePoints, deadlineMinutes,
+
+        List<Vehicle> shortestFirst = new ArrayList<Vehicle>(vehicles);
+        List<Vehicle> longestFirst = new ArrayList<Vehicle>(vehicles);
+        Collections.sort(shortestFirst, SHORTEST_FIRST);
+        Collections.sort(longestFirst, LONGEST_FIRST);
+
+        int original = simulate(vehicles, activePoints);
+        if (original <= deadlineMinutes) {
+            return new Result(original, original, activePoints, deadlineMinutes,
                     true, "Исходный порядок подходит: изменений не требуется.");
         }
 
-        List<Vehicle> shortFirst = new ArrayList<Vehicle>(vehicles);
-        Collections.sort(shortFirst, new Comparator<Vehicle>() {
-            @Override public int compare(Vehicle first, Vehicle second) {
-                return Integer.compare(first.getCheckTime(), second.getCheckTime());
-            }
-        });
+        int best = original;
+        int bestPointCount = activePoints;
+        // First try reordering without opening a reserve checkpoint; then
+        // check all existing reserves in increasing order of additional lanes.
+        for (int points = activePoints; points <= installedPoints; ++points) {
+            List<List<Vehicle>> options = new ArrayList<List<Vehicle>>();
+            if (points != activePoints) options.add(vehicles);
+            options.add(shortestFirst);
+            options.add(longestFirst);
 
-        int reordered = simulate(shortFirst, activePoints);
-        if (reordered <= deadlineMinutes) {
-            return new Result(current, reordered, activePoints, deadlineMinutes,
-                    true, "Решение: изменить порядок очереди (сначала короткие проверки). "
-                            + "Результат подтверждён моделированием.");
-        }
-
-        for (int pointCount = activePoints + 1; pointCount <= installedPoints; ++pointCount) {
-            int fifo = simulate(vehicles, pointCount);
-            if (fifo <= deadlineMinutes) {
-                return new Result(current, fifo, pointCount, deadlineMinutes,
-                        true, "Решение: открыть " + (pointCount - activePoints)
-                                + " резервных пунктов из существующих " + installedPoints + ".");
+            for (int option = 0; option < options.size(); ++option) {
+                int resultMinutes = simulate(options.get(option), points);
+                if (resultMinutes < best) {
+                    best = resultMinutes;
+                    bestPointCount = points;
+                }
+                if (resultMinutes > deadlineMinutes) continue;
+                String change = points == activePoints ? "" :
+                        "открыть " + (points - activePoints) + " резервных пунктов";
+                if (points == activePoints || option != 0) {
+                    String ordering = points == activePoints
+                            ? (option == 0 ? "по возрастанию" : "по убыванию")
+                            : (option == 1 ? "по возрастанию" : "по убыванию");
+                    change += (change.isEmpty() ? "" : " и ")
+                            + "изменить порядок очереди " + ordering + " времени проверки";
+                }
+                return new Result(original, resultMinutes, points, deadlineMinutes,
+                        true, "Решение: " + change + ". Проверено исходной моделью Simulation.");
             }
-            int optimized = simulate(shortFirst, pointCount);
-            if (optimized <= deadlineMinutes) {
-                return new Result(current, optimized, pointCount, deadlineMinutes,
-                        true, "Решение: открыть " + (pointCount - activePoints)
-                                + " резервных пунктов и изменить порядок очереди.");
-            }
         }
-        return new Result(current, current, activePoints, deadlineMinutes, false,
-                "В заданный срок решение не найдено: проверены перестановка очереди "
-                        + "и все доступные резервные пункты. Физические ограничения не изменяются.");
+        return new Result(original, best, bestPointCount, deadlineMinutes, false,
+                "Решение в проверенных вариантах не найдено: рассмотрены исходный порядок, "
+                        + "проверки от коротких к долгим и от долгих к коротким, а также все "
+                        + "существующие резервные пункты. Это НЕ доказательство "
+                        + "невозможности других перестановок.");
     }
 
-    /**
-     * Runs the actual laboratory work No. 2 event-driven simulation to
-     * completion. All vehicles arrive at simulation minute 0.
-     */
+    /** Uses the real lab No. 2 event-driven simulation, minute by minute. */
     public int simulate(List<Vehicle> vehicles, int pointCount) {
         if (vehicles == null || vehicles.contains(null) || pointCount < 1 || pointCount > 100) {
             throw new IllegalArgumentException("Неверные параметры расчёта");
         }
         if (vehicles.isEmpty()) return 0;
         Simulation simulation = new Simulation(pointCount);
-        long upperBound = 0;
+        long maximumMinutes = 0;
         for (Vehicle vehicle : vehicles) {
-            simulation.addVehicle(vehicle);
-            upperBound += vehicle.getCheckTime();
+            // Simulation mutates arrival time and rejection reason. Use a copy
+            // so asking for a feasibility estimate never changes the caller's queue.
+            simulation.addVehicle(VehicleFactory.copyOf(vehicle));
+            maximumMinutes += vehicle.getCheckTime();
         }
-        if (upperBound > 100000) {
+        if (maximumMinutes > 100000) {
             throw new IllegalArgumentException("Слишком большое время для демонстрации");
         }
         while (simulation.getCompleted() < vehicles.size()) simulation.step();
         return simulation.getTime();
     }
 
-    /** Example: 4 trailers (4 min each), one active and one available reserve lane. */
+    /** Four legal trailers, each with a four-minute check, demonstrate a reserve lane. */
     public List<Vehicle> exampleQueue() {
         List<Vehicle> vehicles = new ArrayList<Vehicle>();
         for (int index = 0; index < 4; ++index) {
@@ -93,7 +114,7 @@ public final class SolvabilityService {
         return vehicles;
     }
 
-    /** Value object describing an independently verifiable proposal. */
+    /** Recorded conclusion; false means "not found", not "mathematically impossible". */
     public static final class Result {
         private final int initialMinutes;
         private final int proposedMinutes;

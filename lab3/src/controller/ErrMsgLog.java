@@ -28,6 +28,11 @@ public final class ErrMsgLog {
         this.logDirectory = logDirectory;
     }
 
+    /** Formats an error even if the log directory could not be initialized. */
+    public static String initializationError(IOException exception) {
+        return "Ошибка инициализации журнала: " + exception.getMessage();
+    }
+
     public synchronized int getErrorCount() {
         return errorCount;
     }

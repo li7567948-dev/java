@@ -19,7 +19,7 @@ public final class Main {
         try {
             messages = new ErrMsgLog(Paths.get("logs"));
         } catch (IOException exception) {
-            System.err.println("Невозможно открыть папку логов: " + exception.getMessage());
+            System.err.println(ErrMsgLog.initializationError(exception));
             return;
         }
         Controller controller = new Controller(view, messages, Paths.get("results"));
