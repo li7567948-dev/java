@@ -1,0 +1,13 @@
+PASS: root_debug-False_autotests-False
+PASS: root_debug-False_autotests-True
+PASS: root_debug-True_autotests-False
+PASS: root_debug-True_autotests-True
+PASS: user_debug-False_autotests-False
+PASS: user_debug-False_autotests-True
+PASS: user_debug-True_autotests-False
+PASS: user_debug-True_autotests-True
+PASS: CRUD, manual tests, simulation, invalid menu/ID, persistence, append
+PASS: wrong password
+PASS: missing configuration
+PASS: corrupt database remains untouched
+TOTAL: 12 passed, 0 failed
